@@ -1,9 +1,13 @@
-# scripts-local — Dev Team Tools
+# Dev Team Tools
 
-Scripts for dev team to interact with lakeFS + SeaweedFS + Auth Server.
-Gitignored — not committed to the repo.
+Scripts for dev team to interact with lakeFS + SeaweedFS + Auth Server,
+including zstd-compressed model packing/unpacking. The scripts live at the
+project root.
 
-> Want to call these from any directory instead of `./scripts-local/...`?
+> `bin/lakectl` (the lakectl binary) and `.lakectl-credentials.env` (lakeFS keys)
+> are gitignored — never commit them. The scripts themselves are committed.
+
+> Want to call these from any directory instead of `./...`?
 > See [Make Scripts Global](#make-scripts-global-optional) at the bottom.
 
 ## Quick Start
@@ -15,10 +19,10 @@ Gitignored — not committed to the repo.
 #    ./scripts/setup.sh
 
 # 2. Run once on your dev machine: install lakectl + configure access
-./scripts-local/dev-setup.sh
+./dev-setup.sh
 
 # 3. Check all services are healthy
-./scripts-local/health.sh
+./health.sh
 ```
 
 ## Services
@@ -31,16 +35,59 @@ Gitignored — not committed to the repo.
 
 ---
 
+## Pack a Model Folder (zstd + zip)
+
+```bash
+./pack.sh <folder> [options]
+
+# Default: zstd-compress weight files (.pkl/.pt/.bin/.safetensors), then zip
+./pack.sh ./model_a                         # -> ./model_a.zip
+
+# Plain zip (skip zstd)
+./pack.sh ./model_a --no-compress
+
+# Custom extensions + zstd level
+./pack.sh ./model_a -e pkl,pt -l 9
+
+# Custom output path
+./pack.sh ./model_a -o /tmp/out.zip
+```
+
+Options:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--no-compress` | off | Skip zstd; produce a plain zip |
+| `-e, --extensions <list>` | `pkl,pt,bin,safetensors` | Comma-separated extensions to compress (env: `PACK_EXTENSIONS`) |
+| `-l, --level <1..19>` | `3` | zstd compression level |
+| `-o, --output <path>` | `./<folder>.zip` | Output zip path |
+
+What it does:
+1. Copies the folder to a temp staging dir (the input is **never modified**).
+2. zstd-compresses each matching file to `<name>.<ext>.zst` (original removed from the zip).
+3. Zips the folder **contents** at root (so `unzip -d <dest>/` yields `<dest>/<contents>`).
+4. Prints the `upload.sh` command to run next.
+
+The `.zst` extension is self-describing: `unpack.sh` and the spatialX poller
+auto-detect `*.zst` files inside the zip and decompress them. Plain zips
+(`--no-compress`) round-trip correctly too — the decompress step is a no-op.
+
+---
+
 ## Upload a Model (file or folder)
 
 ```bash
-./scripts-local/upload.sh <file_or_folder> <repo> <branch> <version_tag>
+./upload.sh <file_or_folder> <repo> <branch> <version_tag>
 
-# Upload a single file, commit, tag as v1.0.0
-./scripts-local/upload.sh ./model.zip ml-models main v1.0.0
+# Upload a packed zip (typical workflow after ./pack.sh)
+./pack.sh ./model_a -o ./model_a.zip
+./upload.sh ./model_a.zip ml-models main v1.0.0
+
+# Upload a single file directly
+./upload.sh ./model.zip ml-models main v1.0.0
 
 # Upload a folder (recursive)
-./scripts-local/upload.sh ./model_a/ ml-models main v1.0.0
+./upload.sh ./model_a/ ml-models main v1.0.0
 ```
 
 This will:
@@ -48,61 +95,100 @@ This will:
 2. Commit with `version=<tag>` metadata
 3. Tag the commit as `<version_tag>`
 
+> **spatialX integration:** spatialX's lakeFS poller checks the `ml-models@main`
+> commit every 1 minute. It only picks up objects ending in `.zip`. When it
+> downloads a packed zip, it unzips and zstd-decompresses automatically, leaving
+> the unpacked model folder at `<DefaultModelPath>/<model>/`. No manual
+> decompression is needed on the spatialX side.
+
 ---
 
 ## Download a Model (file or folder)
 
 ```bash
-./scripts-local/download.sh <repo> <ref> <path> [output_path] [--unzip]
+./download.sh <repo> <ref> <path> [output_path] [--unzip|--unpack]
 
 # Download a single file by tag
-./scripts-local/download.sh ml-models v1.0.0 model.zip
+./download.sh ml-models v1.0.0 model.zip
 
 # Download a folder by tag (recursive)
-./scripts-local/download.sh ml-models v1.0.0 model_a/
+./download.sh ml-models v1.0.0 model_a/
 
 # Download to custom path
-./scripts-local/download.sh ml-models v1.0.0 model.zip ./downloaded.zip
+./download.sh ml-models v1.0.0 model.zip ./downloaded.zip
 
-# Download + auto-unzip
-./scripts-local/download.sh ml-models v1.0.0 model.zip --unzip
+# Download + plain unzip
+./download.sh ml-models v1.0.0 model.zip --unzip
+
+# Download + unpack (auto zstd-decompress via unpack.sh)
+./download.sh ml-models v1.0.0 model.zip --unpack
 ```
+
+`--unzip` runs a plain `unzip` (leaves `.zst` files intact). `--unpack`
+delegates to `unpack.sh`, which auto-detects and decompresses `.zst` files —
+use this for zips produced by `pack.sh`.
+
+---
+
+## Unpack a Model Zip (unzip + zstd decompress)
+
+```bash
+./unpack.sh <zip> [-d <dest_dir>] [-f]
+
+# Default: extract to ./<basename>/ (model_a.zip -> ./model_a/)
+./unpack.sh ./model_a.zip
+
+# Custom destination
+./unpack.sh ./model_a.zip -d ./restored
+
+# Overwrite existing destination
+./unpack.sh ./model_a.zip -f
+```
+
+What it does:
+1. Unzips into a staging directory.
+2. Detects `*.zst` files inside; if found, decompresses each with `zstd -d`
+   (restoring `x.pkl.zst` → `x.pkl`, removing the `.zst`).
+3. Atomically moves the staging dir to the destination.
+
+Plain zips (no `.zst` files) are handled correctly — the decompress loop is a
+no-op. Requires `unzip`; requires `zstd` only if the zip contains `.zst` files.
 
 ---
 
 ## Create a New Repo (first time only)
 
 ```bash
-./scripts-local/lakectl.sh repo create lakefs://ml-models s3://lakefs-data/ml-models --default-branch main
+./lakectl.sh repo create lakefs://ml-models s3://lakefs-data/ml-models --default-branch main
 ```
 
 ## List Repos / Files / Tags
 
 ```bash
-./scripts-local/lakectl.sh repo list
-./scripts-local/lakectl.sh fs ls lakefs://ml-models/main/
-./scripts-local/lakectl.sh tag list lakefs://ml-models
+./lakectl.sh repo list
+./lakectl.sh fs ls lakefs://ml-models/main/
+./lakectl.sh tag list lakefs://ml-models
 ```
 
 ## Branch + Merge
 
 ```bash
-./scripts-local/lakectl.sh branch create lakefs://ml-models/experiment -s lakefs://ml-models/main
-./scripts-local/upload.sh ./model_v2.zip ml-models experiment v2.0.0
-./scripts-local/lakectl.sh merge lakefs://ml-models/experiment lakefs://ml-models/main
+./lakectl.sh branch create lakefs://ml-models/experiment -s lakefs://ml-models/main
+./upload.sh ./model_v2.zip ml-models experiment v2.0.0
+./lakectl.sh merge lakefs://ml-models/experiment lakefs://ml-models/main
 ```
 
 ## View Commit Log
 
 ```bash
-./scripts-local/lakectl.sh log lakefs://ml-models/main
+./lakectl.sh log lakefs://ml-models/main
 ```
 
 ## Roll Back (revert a commit)
 
 ```bash
-./scripts-local/lakectl.sh log lakefs://ml-models/main
-./scripts-local/lakectl.sh branch revert lakefs://ml-models/main <commit-id> --yes
+./lakectl.sh log lakefs://ml-models/main
+./lakectl.sh branch revert lakefs://ml-models/main <commit-id> --yes
 ```
 
 ---
@@ -110,7 +196,7 @@ This will:
 ## Health Check
 
 ```bash
-./scripts-local/health.sh
+./health.sh
 ```
 
 Checks lakeFS, lakeFS API, SeaweedFS S3, and Auth Server.
@@ -119,9 +205,9 @@ Checks lakeFS, lakeFS API, SeaweedFS S3, and Auth Server.
 
 ## Make Scripts Global (Optional)
 
-By default the scripts are invoked via `./scripts-local/<script>.sh` from the
-project root. To call them from **any directory** (e.g. `health.sh` from `/tmp`),
-install thin wrapper scripts into a directory already on your `PATH`.
+By default the scripts are invoked via `./<script>.sh` from the project root.
+To call them from **any directory** (e.g. `health.sh` from `/tmp`), install thin
+wrapper scripts into a directory already on your `PATH`.
 
 ### Why wrappers (not symlinks)
 
@@ -139,11 +225,11 @@ script:
 
 ```bash
 # From the project root:
-SCRIPTS_DIR="$(cd scripts-local && pwd)"
-for name in dev-setup.sh health.sh upload.sh download.sh lakectl.sh; do
+PROJECT_DIR="$(pwd)"
+for name in dev-setup.sh health.sh upload.sh download.sh pack.sh unpack.sh lakectl.sh; do
   cat > "$HOME/.local/bin/$name" <<EOF
 #!/bin/bash
-exec ${SCRIPTS_DIR}/${name} "\$@"
+exec ${PROJECT_DIR}/${name} "\$@"
 EOF
   chmod +x "$HOME/.local/bin/$name"
 done
@@ -158,9 +244,11 @@ cd /tmp && command -v health.sh && health.sh
 ### Usage after setup
 
 ```bash
-# From anywhere — identical to the ./scripts-local/... form:
+# From anywhere — identical to the ./... form:
 health.sh
 upload.sh ./model.zip ml-models main v1.0.0
+pack.sh ./model_a
+unpack.sh ./model_a.zip
 upload.sh ./model_a/ ml-models main v1.0.0
 download.sh ml-models v1.0.0 model_a/
 download.sh ml-models v1.0.0 model.zip --unzip
@@ -172,11 +260,13 @@ dev-setup.sh
 
 | Command | Backed by |
 |---------|-----------|
-| `dev-setup.sh` | `scripts-local/dev-setup.sh` |
-| `health.sh` | `scripts-local/health.sh` |
-| `upload.sh` | `scripts-local/upload.sh` |
-| `download.sh` | `scripts-local/download.sh` |
-| `lakectl.sh` | `scripts-local/lakectl.sh` |
+| `dev-setup.sh` | `dev-setup.sh` |
+| `health.sh` | `health.sh` |
+| `upload.sh` | `upload.sh` |
+| `download.sh` | `download.sh` |
+| `pack.sh` | `pack.sh` |
+| `unpack.sh` | `unpack.sh` |
+| `lakectl.sh` | `lakectl.sh` |
 
 ### If the project moves
 
@@ -191,11 +281,13 @@ overwrite the wrappers with the updated path.
 | Script | Description |
 |--------|-------------|
 | `dev-setup.sh` | Install lakectl + configure access (run once) |
+| `pack.sh` | Pack a model folder: zstd-compress weights, then zip |
 | `upload.sh` | Upload file or folder + commit + tag |
-| `download.sh` | Download file or folder via lakectl (optional: `--unzip`) |
+| `download.sh` | Download file or folder via lakectl (optional: `--unzip`/`--unpack`) |
+| `unpack.sh` | Unpack a zip: unzip + auto zstd-decompress `.zst` files |
 | `health.sh` | Check lakeFS + SeaweedFS + Auth Server |
 | `lakectl.sh` | Raw lakectl access (for advanced operations) |
-| `bin/lakectl` | lakectl binary (downloaded by `dev-setup.sh`) |
+| `bin/lakectl` | lakectl binary (downloaded by `dev-setup.sh`, gitignored) |
 
 ---
 
@@ -203,17 +295,23 @@ overwrite the wrappers with the updated path.
 
 ```bash
 # 1. First time: install lakectl
-./scripts-local/dev-setup.sh
+./dev-setup.sh
 
 # 2. Create repo (first time only)
-./scripts-local/lakectl.sh repo create lakefs://ml-models s3://lakefs-data/ml-models --default-branch main
+./lakectl.sh repo create lakefs://ml-models s3://lakefs-data/ml-models --default-branch main
 
-# 3. Upload model folder
-./scripts-local/upload.sh ./model_a/ ml-models main v1.0.0
+# 3. Pack a model folder (zstd-compress weights -> zip)
+./pack.sh ./model_a -o ./model_a.zip
 
-# 4. Download model folder (by tag)
-./scripts-local/download.sh ml-models v1.0.0 model_a/
+# 4. Upload the packed zip, commit, tag
+./upload.sh ./model_a.zip ml-models main v1.0.0
 
-# 5. Download single file + unzip
-./scripts-local/download.sh ml-models v1.0.0 model.zip --unzip
+# 5. Download the zip by tag
+./download.sh ml-models v1.0.0 model_a.zip
+
+# 6. Unpack (unzip + auto zstd-decompress)
+./unpack.sh ./model_a.zip
+
+# Or combine download + unpack in one step:
+./download.sh ml-models v1.0.0 model_a.zip --unpack
 ```

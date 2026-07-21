@@ -1,3 +1,4 @@
 workspace/
 scripts-local copy/
 bin/
+.lakectl-credentials.env

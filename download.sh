@@ -4,38 +4,43 @@ set -euo pipefail
 # =============================================================================
 # download.sh — Download a file or folder from lakeFS via lakectl
 #
-# Usage:  ./download.sh <repo> <ref> <path> [output_path] [--unzip]
+# Usage:  ./download.sh <repo> <ref> <path> [output_path] [--unzip|--unpack]
 #
 # Examples:
 #   ./download.sh ml-models v1.0.0 model.zip                 # single file
 #   ./download.sh ml-models v1.0.0 model_a/                  # folder (recursive)
 #   ./download.sh ml-models v1.0.0 model.zip ./out.zip       # custom output
-#   ./download.sh ml-models v1.0.0 model.zip --unzip        # download + unzip
+#   ./download.sh ml-models v1.0.0 model.zip --unzip        # download + plain unzip
+#   ./download.sh ml-models v1.0.0 model.zip --unpack       # download + unpack.sh
+#                                                          # (auto zstd-decompress)
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LAKECTL="$SCRIPT_DIR/lakectl.sh"
 
 UNZIP=false
+UNPACK=false
 OUTPUT=""
 ARGS=()
 
 for arg in "$@"; do
   case "$arg" in
-    --unzip) UNZIP=true ;;
-    *)       ARGS+=("$arg") ;;
+    --unzip)  UNZIP=true ;;
+    --unpack) UNPACK=true ;;
+    *)        ARGS+=("$arg") ;;
   esac
 done
 set -- "${ARGS[@]}"
 
 if [ $# -lt 3 ]; then
-  echo "Usage: $0 <repo> <ref> <path> [output_path] [--unzip]"
+  echo "Usage: $0 <repo> <ref> <path> [output_path] [--unzip|--unpack]"
   echo ""
   echo "Examples:"
   echo "  $0 ml-models v1.0.0 model.zip"
   echo "  $0 ml-models v1.0.0 model_a/"
   echo "  $0 ml-models v1.0.0 model.zip ./downloaded.zip"
   echo "  $0 ml-models v1.0.0 model.zip --unzip"
+  echo "  $0 ml-models v1.0.0 model.zip --unpack   # auto zstd-decompress via unpack.sh"
   exit 1
 fi
 
@@ -73,4 +78,13 @@ if [ "$UNZIP" = true ]; then
   unzip -o "$OUTPUT" -d "$EXTRACT_DIR" >/dev/null
   ok "Extracted to $EXTRACT_DIR/"
   ls -la "$EXTRACT_DIR/"
+fi
+
+if [ "$UNPACK" = true ]; then
+  UNPACK_SH="$SCRIPT_DIR/unpack.sh"
+  if [ ! -x "$UNPACK_SH" ]; then
+    fail "unpack.sh not found at $UNPACK_SH"
+  fi
+  info "Handing off to unpack.sh (auto zstd-decompress) ..."
+  "$UNPACK_SH" "$OUTPUT" -f
 fi
