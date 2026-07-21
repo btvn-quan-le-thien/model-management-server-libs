@@ -1,0 +1,7 @@
+{
+  "default_retention_days": 0,
+  "branches": [
+    {"branch_id": "main", "retention_days": 0},
+    {"branch_id": "test", "retention_days": 0}
+  ]
+}
