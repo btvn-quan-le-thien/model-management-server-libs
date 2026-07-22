@@ -167,6 +167,9 @@ if [ "$NO_COMPRESS" = false ] && [ "$COMPRESSED_COUNT" -eq 0 ] && [ ${#FIND_NAME
 fi
 
 # --- Zip the staged folder contents at root (so unzip -d <dest>/ yields <dest>/<contents>) ---
+# Start from a clean archive: `zip -r` appends to/merges with an existing zip,
+# which would mix stale entries from a previous run into the new one.
+rm -f "$OUTPUT_ABS"
 info "Creating zip ..."
 (
   cd "$STAGE"
