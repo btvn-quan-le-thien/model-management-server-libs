@@ -1,0 +1,219 @@
+[1;34m[INFO][0m  run id: 20260722031940
+[1;34m[INFO][0m  lakeFS reachable → running upload/download tests
+[1;34m[INFO][0m  ▶ running test_pack.sh ...
+
+[1;36m━━━ test_pack.sh — pack.sh (zstd vs no-compress) ━━━[0m
+[1;34m[INFO][0m  fixture: /tmp/tmp.ZPuc23LaxW/model_test (5242880 bytes/weight file, 15728818 bytes total)
+
+[1;36m━━━ pack WITH zstd (default) ━━━[0m
+[1;34m[INFO][0m  zstd.zip = 1392 bytes
+[1;32m[PASS][0m  zstd zip created
+[1;32m[PASS][0m  zstd zip non-empty
+[1;32m[PASS][0m  weights compressed to .zst (model.pkl)
+[1;32m[PASS][0m  weights compressed to .zst (weights.pt)
+[1;32m[PASS][0m  weights compressed to .zst (vocab.bin)
+[1;32m[PASS][0m  config.json present (uncompressed)
+[1;32m[PASS][0m  config.json not compressed
+[1;32m[PASS][0m  README.md present (uncompressed)
+[1;32m[PASS][0m  zstd zip < original folder size (reduced)
+
+[1;36m━━━ pack WITHOUT zstd (--no-compress) ━━━[0m
+[1;34m[INFO][0m  plain.zip = 39174 bytes
+[1;32m[PASS][0m  plain zip created
+[1;32m[PASS][0m  plain zip non-empty
+[1;32m[PASS][0m  raw model.pkl present
+[1;32m[PASS][0m  raw weights.pt present
+[1;32m[PASS][0m  raw vocab.bin present
+[1;32m[PASS][0m  no .zst files in plain zip
+[1;32m[PASS][0m  config.json present
+[1;32m[PASS][0m  README.md present
+
+[1;36m━━━ zstd vs plain (zstd should be smaller) ━━━[0m
+[1;34m[INFO][0m  zstd.zip=1392  plain.zip=39174  folder=15728818
+[1;32m[PASS][0m  zstd zip < plain zip (zstd adds compression beyond zip deflate)
+
+[1;36m━━━ input folder unchanged ━━━[0m
+[1;32m[PASS][0m  input folder still present after pack (pack stages a copy)
+[1;32m[PASS][0m  source model.pkl untouched
+[1;32m[PASS][0m  source weights.pt untouched
+[1;32m[PASS][0m  no .zst leaked into source folder
+
+[1m--- test_pack.sh summary ---[0m
+  [1;32mPASS:[0m 22   [1;31mFAIL:[0m 0   [1;33mSKIP:[0m 0
+[1;34m[INFO][0m  ▶ running test_unpack.sh ...
+
+[1;36m━━━ test_unpack.sh — pack/unpack round-trip ━━━[0m
+[1;34m[INFO][0m  fixture: /tmp/tmp.p3Sksu6JwL/model_test
+
+[1;36m━━━ round-trip WITH zstd ━━━[0m
+[1;32m[PASS][0m  zstd zip created
+[1;32m[PASS][0m  zstd round-trip: restored == original
+[1;32m[PASS][0m  restored model.pkl (decompressed)
+[1;32m[PASS][0m  no leftover .zst after unpack
+[1;32m[PASS][0m  config.json restored
+
+[1;36m━━━ round-trip WITHOUT zstd ━━━[0m
+[1;32m[PASS][0m  plain zip created
+[1;32m[PASS][0m  plain round-trip: restored == original
+[1;32m[PASS][0m  plain: model.pkl restored
+[1;32m[PASS][0m  plain: weights.pt restored
+
+[1;36m━━━ force guard (-f) ━━━[0m
+[1;32m[PASS][0m  unpack refused to overwrite existing dest without -f
+[1;32m[PASS][0m  unpack overwrote existing dest WITH -f
+[1;32m[PASS][0m  after -f overwrite: restored == original
+
+[1m--- test_unpack.sh summary ---[0m
+  [1;32mPASS:[0m 12   [1;31mFAIL:[0m 0   [1;33mSKIP:[0m 0
+[1;34m[INFO][0m  ▶ running test_credentials.sh ...
+
+[1;36m━━━ test_credentials.sh — dev-setup.sh credential validation ━━━[0m
+
+[1;36m━━━ no credentials (credentials file missing) ━━━[0m
+[1;32m[PASS][0m  dev-setup.sh failed without credentials (exit non-zero)
+[1;32m[PASS][0m  error message contains 'Credentials file not found'
+
+[1;36m━━━ empty credentials (credential is none) ━━━[0m
+[1;32m[PASS][0m  lakectl failed with empty credentials (exit non-zero)
+[1;32m[PASS][0m  empty creds rejected with 401 Unauthorized
+
+[1;36m━━━ correct credentials ━━━[0m
+[1;32m[PASS][0m  correct credentials: lakectl repo list succeeded
+[1;32m[PASS][0m  correct credentials: repo list returned repos
+
+[1;36m━━━ wrong credentials brute force (100 attempts) ━━━[0m
+[1;34m[INFO][0m  simulating 100 brute-force attempts with different wrong credentials...
+[1;34m[INFO][0m    ... 25/100 attempts (25 rejected, 0 breached)
+[1;34m[INFO][0m    ... 50/100 attempts (50 rejected, 0 breached)
+[1;34m[INFO][0m    ... 75/100 attempts (75 rejected, 0 breached)
+[1;34m[INFO][0m    ... 100/100 attempts (100 rejected, 0 breached)
+[1;34m[INFO][0m  brute force completed in 3s
+[1;34m[INFO][0m  results: 100/100 rejected, 0/100 breached
+[1;32m[PASS][0m  all 100 brute-force attempts rejected
+[1;32m[PASS][0m  no brute-force attempt succeeded (no breach)
+
+[1m--- test_credentials.sh summary ---[0m
+  [1;32mPASS:[0m 8   [1;31mFAIL:[0m 0   [1;33mSKIP:[0m 0
+[1;34m[INFO][0m  ▶ running test_upload.sh ...
+
+[1;36m━━━ test_upload.sh — upload.sh (repo: unit-test-20260722031940) ━━━[0m
+[1;34m[INFO][0m  run id: 20260722031940
+[1;34m[INFO][0m  zip tag:    unit-test-20260722031940
+[1;34m[INFO][0m  folder tag: unit-test-20260722031940-folder
+[1;34m[INFO][0m  Creating repo 'unit-test-20260722031940' (s3://lakefs-data/unit-test-20260722031940) ...
+Repository: lakefs://unit-test-20260722031940
+Repository 'unit-test-20260722031940' created:
+storage namespace: s3://lakefs-data/unit-test-20260722031940
+default branch: main
+timestamp: 1784690383
+[1;32m[PASS][0m  repo created: unit-test-20260722031940
+[1;32m[PASS][0m  fixture packed
+
+[1;36m━━━ upload zip → unit-test-20260722031940/main (tag unit-test-20260722031940) ━━━[0m
+[1;32m[PASS][0m  upload.sh exited 0 (zip)
+[1;32m[PASS][0m  object model_test.zip listed on main
+[1;32m[PASS][0m  commit metadata version=unit-test-20260722031940 present in log
+[1;32m[PASS][0m  tag unit-test-20260722031940 created
+
+[1;36m━━━ upload folder → unit-test-20260722031940/main (tag unit-test-20260722031940-folder) ━━━[0m
+[1;32m[PASS][0m  upload.sh exited 0 (folder)
+[1;32m[PASS][0m  folder uploaded: model_test/config.json visible
+[1;32m[PASS][0m  tag unit-test-20260722031940-folder created
+
+[1m--- test_upload.sh summary ---[0m
+  [1;32mPASS:[0m 9   [1;31mFAIL:[0m 0   [1;33mSKIP:[0m 0
+[1;33m[WARN][0m  --no-cleanup: leaving repo unit-test-20260722031940 in place (download tests will use it)
+[1;34m[INFO][0m  ▶ running test_download.sh ...
+
+[1;36m━━━ test_download.sh — download.sh (repo: unit-test-20260722031940) ━━━[0m
+[1;34m[INFO][0m  run id: 20260722031940
+[1;34m[INFO][0m  dl zip tag:    unit-test-20260722031940-dl
+[1;34m[INFO][0m  dl folder tag: unit-test-20260722031940-dlfld
+[1;34m[INFO][0m  Repo 'unit-test-20260722031940' already exists
+[1;32m[PASS][0m  fixture packed
+[1;34m[INFO][0m  source zip sha256: 48baea77cabf82109f5e6b5a23a6e42f0e5d483d76849d20b66128992d60a5d0
+
+[1;36m━━━ provision: upload zip (tag unit-test-20260722031940-dl) ━━━[0m
+[1;32m[PASS][0m  zip uploaded for download tests
+
+[1;36m━━━ provision: upload folder (tag unit-test-20260722031940-dlfld) ━━━[0m
+[1;32m[PASS][0m  folder uploaded for download tests
+
+[1;36m━━━ download file by tag (byte-exact sha256) ━━━[0m
+[1;32m[PASS][0m  downloaded zip exists
+[1;32m[PASS][0m  downloaded zip sha256 == uploaded zip sha256 (byte-exact)
+[1;32m[PASS][0m  second download sha256 == first (deterministic)
+
+[1;36m━━━ download --unzip (leaves .zst) ━━━[0m
+[1;32m[PASS][0m  plain unzip left model.pkl.zst intact
+[1;32m[PASS][0m  no decompressed model.pkl after --unzip (as expected for plain unzip)
+
+[1;36m━━━ download --unpack (auto zstd-decompress) ━━━[0m
+[1;32m[PASS][0m  download --unpack: restored == original fixture
+[1;32m[PASS][0m  model.pkl decompressed after --unpack
+[1;32m[PASS][0m  no leftover .zst after --unpack
+
+[1;36m━━━ download folder by tag (recursive) ━━━[0m
+[1;32m[PASS][0m  folder downloaded to /tmp/tmp.FuYmiQILgM/downloaded_folder
+[1;32m[PASS][0m  folder download contents == original (flat layout)
+
+[1m--- test_download.sh summary ---[0m
+  [1;32mPASS:[0m 13   [1;31mFAIL:[0m 0   [1;33mSKIP:[0m 0
+[1;34m[INFO][0m  ▶ running test_big_upload.sh ...
+
+[1;36m━━━ test_big_upload.sh — pack + upload 500 MB ━━━[0m
+[1;34m[INFO][0m  run id: 20260722031940
+[1;34m[INFO][0m  fixture size:  500 MB
+[1;34m[INFO][0m  zstd tag:      unit-test-20260722031940-big
+[1;34m[INFO][0m  no-comp tag:   unit-test-20260722031940-bignc
+[1;34m[INFO][0m  Repo 'unit-test-20260722031940' already exists
+
+[1;36m━━━ build 500 MB fixture (compressible data) ━━━[0m
+[1;34m[INFO][0m  fixture ready: /tmp/tmp.knWTktP2aV/model_big_a (501M) in 0s
+
+[1;36m━━━ pack with zstd → model_big_a.zip ━━━[0m
+[1;32m[PASS][0m  zstd zip created
+[1;34m[INFO][0m  model_big_a.zip = 4.0K (1219 bytes) in 0s
+
+[1;36m━━━ pack --no-compress → model_big_a_no_compress.zip ━━━[0m
+[1;32m[PASS][0m  no-compress zip created
+[1;34m[INFO][0m  model_big_a_no_compress.zip = 1.3M (1271598 bytes) in 2s
+
+[1;36m━━━ size comparison (zstd should reduce the big zip) ━━━[0m
+[1;34m[INFO][0m    zstd zip:      4.0K (1219 bytes)
+[1;34m[INFO][0m    no-comp zip:   1.3M (1271598 bytes)
+[1;32m[PASS][0m  zstd zip < no-compress zip (zstd reduces big zip size)
+
+[1;36m━━━ upload model_big_a.zip (zstd) → unit-test-20260722031940/main (tag unit-test-20260722031940-big) ━━━[0m
+[1;32m[PASS][0m  upload.sh exited 0 (zstd zip) in 0s
+[1;32m[PASS][0m  object model_big_a.zip listed on main
+[1;32m[PASS][0m  tag unit-test-20260722031940-big created
+
+[1;36m━━━ upload model_big_a_no_compress.zip (no-compress) → unit-test-20260722031940/main (tag unit-test-20260722031940-bignc) ━━━[0m
+[1;32m[PASS][0m  upload.sh exited 0 (no-compress zip) in 0s
+[1;32m[PASS][0m  object model_big_a_no_compress.zip listed on main
+[1;32m[PASS][0m  tag unit-test-20260722031940-bignc created
+
+[1;36m━━━ download + sha256 verify (big-file round-trip) ━━━[0m
+[1;32m[PASS][0m  downloaded big zip sha256 == uploaded (byte-exact)
+
+[1m--- test_big_upload.sh summary ---[0m
+  [1;32mPASS:[0m 10   [1;31mFAIL:[0m 0   [1;33mSKIP:[0m 0
+[1;33m[WARN][0m  --no-cleanup: leaving repo unit-test-20260722031940 in place
+
+[1;36m━━━ cleanup ━━━[0m
+[1;34m[INFO][0m  Deleting repo 'unit-test-20260722031940' ...
+Repository: lakefs://unit-test-20260722031940
+Repository 'unit-test-20260722031940' deleted
+[1;32m[PASS][0m  repo deleted: unit-test-20260722031940
+
+[1;36m━━━ OVERALL RESULTS ━━━[0m
+  PASS  test_pack.sh
+  PASS  test_unpack.sh
+  PASS  test_credentials.sh
+  PASS  test_upload.sh
+  PASS  test_download.sh
+  PASS  test_big_upload.sh
+
+[1mTotals: [1;32mPASS 74[0m  [1;31mFAIL 0[0m  [1;33mSKIP 0[0m
+[1;32mAll suites passed.[0m

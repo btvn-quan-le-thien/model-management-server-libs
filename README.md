@@ -4,7 +4,7 @@ Scripts for dev team to interact with lakeFS + SeaweedFS + Auth Server,
 including zstd-compressed model packing/unpacking. The scripts live at the
 project root.
 
-> `bin/lakectl` (the lakectl binary) and `.lakectl-credentials.env` (lakeFS keys)
+> `bin/lakectl` (the lakectl binary) and `config.env` (lakeFS keys + endpoints)
 > are gitignored — never commit them. The scripts themselves are committed.
 
 > Want to call these from any directory instead of `./...`?
@@ -214,7 +214,7 @@ wrapper scripts into a directory already on your `PATH`.
 All scripts locate sibling files relative to their own path using
 `SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"`. A symlink would set `SCRIPT_DIR`
 to the symlink's directory (e.g. `~/.local/bin`), breaking lookups for
-`bin/lakectl`, `lakectl.sh`, and `.lakectl-credentials.env`. A wrapper that
+`bin/lakectl`, `lakectl.sh`, and `config.env`. A wrapper that
 `exec`s the real script by absolute path keeps `$0` pointing at the real
 script, so `SCRIPT_DIR` resolves correctly.
 
